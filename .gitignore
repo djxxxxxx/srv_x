@@ -5,6 +5,7 @@ server-monitor.exe
 *.dll
 *.so
 *.dylib
+*.png
 
 # Test binary
 *.test
@@ -21,6 +22,7 @@ vendor/
 *.swp
 *.swo
 *~
+.kimi
 
 # OS
 .DS_Store
@@ -36,6 +38,7 @@ export/
 # Environment variables
 .env
 .env.local
+*-mcp/
 
 # Build artifacts
 dist/

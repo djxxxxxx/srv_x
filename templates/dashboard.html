@@ -582,21 +582,13 @@
             }
 
             try {
-                await fetch('/api/server/check', {
-                    method: 'POST',
-                    body: new URLSearchParams({ id: id })
-                });
-
-                // 轮询等待检查完成（最多60秒）
-                for (let i = 0; i < 120; i++) {
-                    await new Promise(r => setTimeout(r, 500));
-                    const res = await fetch('/api/server/checking-count?id=' + id);
-                    const count = parseInt(await res.text()) || 0;
-                    if (count === 0) break; // 检查完成
+                const res = await fetch('/api/server/check-sync?id=' + id);
+                const data = await res.json();
+                if (data) {
+                    updateServerRow(id, data);
                 }
-
-                // 局部刷新该服务器状态
-                await refreshServerStatus(id);
+            } catch (e) {
+                console.error('检查服务器失败:', e);
             } finally {
                 if (btn) {
                     btn.textContent = originalText;
@@ -605,60 +597,70 @@
             }
         }
 
-        // 局部刷新单个服务器状态
-        async function refreshServerStatus(id) {
-            try {
-                const res = await fetch('/api/server/status?id=' + id);
-                const data = await res.json();
-                if (data) {
-                    updateServerRow(id, data);
-                }
-            } catch (e) {
-                console.error('刷新状态失败:', e);
-            }
-        }
-
         // 更新服务器行显示
         function updateServerRow(id, data) {
             const row = document.querySelector(`.server-row[data-id="${id}"]`);
             if (!row) return location.reload(); // 如果找不到行，刷新整个页面
 
-            // 更新CPU
-            const cpuEl = row.querySelector('.col-cpu');
-            if (cpuEl && data.CPU !== undefined) {
-                cpuEl.innerHTML = '<span class="label">CPU:</span> ' + renderProgressBar(data.CPU) + ' ' + data.CPU.toFixed(1) + '%';
-            }
+            // 如果有错误，显示错误信息
+            if (data.Error) {
+                const errorHtml = `<span style="color:#ef4444;font-size:11px;">${data.Error}</span>`;
+                const cpuEl = row.querySelector('.col-cpu');
+                if (cpuEl) cpuEl.innerHTML = '<span class="label">CPU:</span> ' + errorHtml;
+                const memEl = row.querySelector('.col-memory');
+                if (memEl) memEl.innerHTML = '<span class="label">内存:</span> ' + errorHtml;
+                const netEl = row.querySelector('.col-network');
+                if (netEl) netEl.innerHTML = '<span class="label">网络:</span> ' + errorHtml;
+                const diskEl = row.querySelector('.col-disks');
+                if (diskEl) diskEl.innerHTML = '-';
+                const svcEl = row.querySelector('.col-services');
+                if (svcEl) svcEl.innerHTML = '-';
+            } else {
+                // 更新CPU
+                const cpuEl = row.querySelector('.col-cpu');
+                if (cpuEl && data.CPU !== undefined) {
+                    cpuEl.innerHTML = '<span class="label">CPU:</span> ' + renderProgressBar(data.CPU) + ' ' + data.CPU.toFixed(1) + '%';
+                }
 
-            // 更新内存
-            const memEl = row.querySelector('.col-memory');
-            if (memEl && data.MemUsage !== undefined) {
-                memEl.innerHTML = '<span class="label">内存:</span> ' + renderProgressBar(data.MemUsage) + ' ' + data.MemUsage.toFixed(1) + '%';
-            }
+                // 更新内存
+                const memEl = row.querySelector('.col-memory');
+                if (memEl && data.MemUsage !== undefined) {
+                    memEl.innerHTML = '<span class="label">内存:</span> ' + renderProgressBar(data.MemUsage) + ' ' + data.MemUsage.toFixed(1) + '%';
+                }
 
-            // 更新磁盘
-            const diskEl = row.querySelector('.col-disks');
-            if (diskEl && data.Disks) {
-                diskEl.innerHTML = renderDisks(data.Disks);
-            }
+                // 更新磁盘
+                const diskEl = row.querySelector('.col-disks');
+                if (diskEl && data.Disks) {
+                    diskEl.innerHTML = renderDisks(data.Disks);
+                }
 
-            // 更新服务
-            const svcEl = row.querySelector('.col-services');
-            if (svcEl && data.Services) {
-                svcEl.innerHTML = renderServices(data.Services);
-            }
+                // 更新服务
+                const svcEl = row.querySelector('.col-services');
+                if (svcEl && data.Services) {
+                    svcEl.innerHTML = renderServices(data.Services);
+                }
 
-            // 更新网络
-            const netEl = row.querySelector('.col-network');
-            if (netEl && data.NetRXBytes !== undefined) {
-                const rxTotal = formatBytes(data.NetRXBytes);
-                const txTotal = formatBytes(data.NetTXBytes);
-                const rxSpeed = (data.NetRXSpeed || 0).toFixed(2);
-                const txSpeed = (data.NetTXSpeed || 0).toFixed(2);
-                netEl.innerHTML = `<span class="label">网络:</span><br>总量: RX ${rxTotal} / TX ${txTotal}<br>瞬时: ↓ ${rxSpeed} KB/s ↑ ${txSpeed} KB/s`;
+                // 更新网络
+                const netEl = row.querySelector('.col-network');
+                if (netEl && data.NetRXBytes !== undefined) {
+                    const rxTotal = formatBytes(data.NetRXBytes);
+                    const txTotal = formatBytes(data.NetTXBytes);
+                    const rxSpeed = (data.NetRXSpeed || 0).toFixed(2);
+                    const txSpeed = (data.NetTXSpeed || 0).toFixed(2);
+                    netEl.innerHTML = `<span class="label">网络:</span><br>总量: RX ${rxTotal} / TX ${txTotal}<br>瞬时: ↓ ${rxSpeed} KB/s ↑ ${txSpeed} KB/s`;
+                }
             }
 
             // 更新时间
-            const timeEl = row.querySelector('.col-time');
+            let timeEl = row.querySelector('.col-time');
+            if (!timeEl && data.CheckedAt) {
+                // 如果元素不存在（初始状态为未检查），动态创建
+                timeEl = document.createElement('div');
+                timeEl.className = 'col-time';
+                timeEl.style.cssText = 'margin-top: 8px; font-size: 10px; color: #888;';
+                const colInfo = row.querySelector('.col-info');
+                if (colInfo) colInfo.appendChild(timeEl);
+            }
             if (timeEl && data.CheckedAt) {
                 const date = new Date(data.CheckedAt);
                 timeEl.innerHTML = '<span class="label">更新:</span> ' + date.toLocaleString('zh-CN');
@@ -690,7 +692,18 @@
             if (!services || services.length === 0) return '-';
             return services.map(s => {
                 const statusClass = s.Status === 'running' ? 'running' : 'stopped';
-                return `<div class="service-item"><span class="service-name">${s.Name}:</span><span class="service-tag ${statusClass}">${s.Status}</span></div>`;
+                let html = `<div class="service-item"><span class="service-name">${s.Name}:</span><span class="service-tag ${statusClass}">${s.Status}</span></div>`;
+                // Oracle 实例详情
+                if (s.Name === 'oracle' && s.Detail) {
+                    const instances = s.Detail.split('|').filter(x => x);
+                    instances.forEach(inst => {
+                        const parts = inst.split('::');
+                        if (parts.length >= 2) {
+                            html += `<div class="service-instance"><span class="instance-name">${parts[0]}:</span><span class="instance-status">${parts[1]}</span></div>`;
+                        }
+                    });
+                }
+                return html;
             }).join('');
         }
 
@@ -712,62 +725,50 @@
                 }
                 lastCheckAllTime = now;
 
-                const response = await fetch('/api/server/checkall', { method: 'POST' });
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                // 获取所有服务器ID
+                const rows = document.querySelectorAll('.server-row');
+                const ids = [];
+                rows.forEach(row => {
+                    const id = row.dataset.id;
+                    if (id) ids.push(parseInt(id));
+                });
+
+                if (ids.length === 0) {
+                    alert('没有可检查的服务器');
+                    return;
                 }
 
                 // 显示进度提示
                 const statusDiv = document.createElement('div');
                 statusDiv.id = 'checkStatus';
                 statusDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#333;color:#fff;padding:20px;border-radius:8px;z-index:9999;';
-                statusDiv.innerHTML = '正在检查服务器...<br><span id="checkCount">0</span> 个服务器检查中';
+                statusDiv.innerHTML = `正在检查服务器...<br><span id="checkCount">0</span> / ${ids.length} 完成`;
                 document.body.appendChild(statusDiv);
 
-                let checkTimes = 0;
-                const maxCheckTimes = 120; // 最多等待60秒 (120 * 500ms)
+                let completed = 0;
+                const countSpan = document.getElementById('checkCount');
 
-                // 轮询检查是否全部完成
-                const checkComplete = async () => {
-                    try {
-                        checkTimes++;
-                        const countRes = await fetch('/api/server/checking-count');
-                        const countText = await countRes.text();
-                        const count = parseInt(countText) || 0; // 防止NaN
-
-                        const countSpan = document.getElementById('checkCount');
+                // 并发检查所有服务器（复用 checkServer 逻辑）
+                const promises = ids.map(id =>
+                    checkServer(id).then(() => {
+                        completed++;
                         if (countSpan) {
-                            if (count === 0) {
-                                countSpan.textContent = '已完成';
-                            } else {
-                                countSpan.textContent = count;
-                            }
+                            countSpan.textContent = completed;
                         }
+                    })
+                );
 
-                        if (count === 0 || checkTimes >= maxCheckTimes) {
-                            // 所有检查完成或超时，刷新页面
-                            setTimeout(() => {
-                                if (document.body.contains(statusDiv)) {
-                                    document.body.removeChild(statusDiv);
-                                }
-                                location.reload();
-                            }, 500); // 延迟500ms让用户看到"已完成"
-                        } else {
-                            // 还有服务器在检查中，继续等待
-                            setTimeout(checkComplete, 500);
-                        }
-                    } catch (err) {
-                        console.error('Error checking status:', err);
-                        // 出错也刷新页面
-                        if (document.body.contains(statusDiv)) {
-                            document.body.removeChild(statusDiv);
-                        }
-                        location.reload();
+                await Promise.all(promises);
+
+                // 全部完成
+                if (countSpan) {
+                    countSpan.textContent = '已完成';
+                }
+                setTimeout(() => {
+                    if (document.body.contains(statusDiv)) {
+                        document.body.removeChild(statusDiv);
                     }
-                };
-
-                // 开始轮询
-                setTimeout(checkComplete, 500);
+                }, 800);
             } catch (error) {
                 console.error('Error:', error);
                 alert('更新失败: ' + error.message);

@@ -57,6 +57,7 @@ type ServerStatus struct {
 	NetTXBytes int64   // 发送总字节数
 	NetRXSpeed float64 // 接收速度 KB/s
 	NetTXSpeed float64 // 发送速度 KB/s
+	Error      string  // 检查错误信息
 }
 
 // ServerStatusDetail 服务器状态详情（用于详情页）
@@ -139,6 +140,7 @@ func InitDB() error {
 		net_tx_bytes INTEGER DEFAULT 0,
 		net_rx_speed REAL DEFAULT 0,
 		net_tx_speed REAL DEFAULT 0,
+		error TEXT DEFAULT '',
 		checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
 	);`
@@ -211,6 +213,9 @@ func InitDB() error {
 
 	// 迁移：为已有用户添加 role 字段（如果不存在）
 	_, _ = db.Exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
+
+	// 迁移：为状态表添加 error 字段（如果不存在）
+	_, _ = db.Exec("ALTER TABLE server_status ADD COLUMN error TEXT DEFAULT ''")
 
 	// 数据库迁移：检查是否需要从旧结构迁移到新结构
 	migrateDatabase()
@@ -602,12 +607,12 @@ func SaveServerStatus(status *ServerStatusDetail) error {
 	// 插入主状态记录
 	result, err := tx.Exec(
 		`INSERT INTO server_status 
-		(server_id, host, username, cpu_usage, mem_total, mem_used, mem_usage, net_rx_bytes, net_tx_bytes, net_rx_speed, net_tx_speed, checked_at) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(server_id, host, username, cpu_usage, mem_total, mem_used, mem_usage, net_rx_bytes, net_tx_bytes, net_rx_speed, net_tx_speed, error, checked_at) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		status.ServerID, status.Host, status.Username,
 		status.CPUUsage, status.MemTotal, status.MemUsed, status.MemUsage,
 		status.NetRXBytes, status.NetTXBytes, status.NetRXSpeed, status.NetTXSpeed,
-		status.CheckedAt,
+		status.Error, status.CheckedAt,
 	)
 	if err != nil {
 		tx.Rollback()
@@ -699,12 +704,12 @@ func GetLatestServerStatus(serverID int64) (*ServerStatusDetail, error) {
 	s := &ServerStatusDetail{}
 	err := db.QueryRow(
 		`SELECT id, server_id, host, username, cpu_usage, mem_total, mem_used, mem_usage, 
-		net_rx_bytes, net_tx_bytes, net_rx_speed, net_tx_speed, checked_at 
+		net_rx_bytes, net_tx_bytes, net_rx_speed, net_tx_speed, error, checked_at 
 		FROM server_status WHERE server_id = ? ORDER BY checked_at DESC LIMIT 1`,
 		serverID,
 	).Scan(&s.ID, &s.ServerID, &s.Host, &s.Username,
 		&s.CPUUsage, &s.MemTotal, &s.MemUsed, &s.MemUsage,
-		&s.NetRXBytes, &s.NetTXBytes, &s.NetRXSpeed, &s.NetTXSpeed, &s.CheckedAt)
+		&s.NetRXBytes, &s.NetTXBytes, &s.NetRXSpeed, &s.NetTXSpeed, &s.Error, &s.CheckedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -768,7 +773,7 @@ func GetServerStatusHistory(serverID int64, limit int) ([]*ServerStatus, error) 
 		s := &ServerStatus{}
 		err := rows.Scan(&s.ID, &s.ServerID, &s.Host, &s.Username,
 			&s.CPUUsage, &s.MemTotal, &s.MemUsed, &s.MemUsage,
-			&s.NetRXBytes, &s.NetTXBytes, &s.NetRXSpeed, &s.NetTXSpeed, &s.CheckedAt)
+			&s.NetRXBytes, &s.NetTXBytes, &s.NetRXSpeed, &s.NetTXSpeed, &s.Error, &s.CheckedAt)
 		if err != nil {
 			continue
 		}
@@ -806,7 +811,7 @@ func GetAllServerStatusOptimized() (map[int64]*ServerStatusDetail, error) {
 	// 查询每个服务器的最新状态ID
 	rows, err := db.Query(`
 		SELECT s.id, s.server_id, s.host, s.username, s.cpu_usage, s.mem_total, s.mem_used, s.mem_usage,
-			s.net_rx_bytes, s.net_tx_bytes, s.net_rx_speed, s.net_tx_speed, s.checked_at
+			s.net_rx_bytes, s.net_tx_bytes, s.net_rx_speed, s.net_tx_speed, s.error, s.checked_at
 		FROM server_status s
 		INNER JOIN (
 			SELECT server_id, MAX(checked_at) as max_checked_at
@@ -826,7 +831,7 @@ func GetAllServerStatusOptimized() (map[int64]*ServerStatusDetail, error) {
 		s := &ServerStatusDetail{}
 		err := rows.Scan(&s.ID, &s.ServerID, &s.Host, &s.Username,
 			&s.CPUUsage, &s.MemTotal, &s.MemUsed, &s.MemUsage,
-			&s.NetRXBytes, &s.NetTXBytes, &s.NetRXSpeed, &s.NetTXSpeed, &s.CheckedAt)
+			&s.NetRXBytes, &s.NetTXBytes, &s.NetRXSpeed, &s.NetTXSpeed, &s.Error, &s.CheckedAt)
 		if err != nil {
 			continue
 		}

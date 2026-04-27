@@ -6,15 +6,28 @@ import (
 	"time"
 )
 
-// checkServer 检查服务器状态（带锁，防止并发检查同一服务器）
-func checkServer(serverID int64) {
+// checkServerSync 同步检查服务器状态，返回结果（带锁，防止并发检查同一服务器）
+func checkServerSync(serverID int64) *ServerStatusDetail {
 	// 获取该服务器的检查锁
 	lock := getServerCheckLock(serverID)
 
-	// 尝试获取锁，如果正在被检查则直接返回
+	// 尝试获取锁，如果正在被检查则直接返回缓存状态
 	if !lock.TryLock() {
 		log.Printf("服务器 %d 正在被检查，跳过本次请求", serverID)
-		return
+		statusCacheMu.RLock()
+		status, ok := statusCache[serverID]
+		statusCacheMu.RUnlock()
+		if ok {
+			status.Error = "服务器正在被检查，请稍后再试"
+			return status
+		}
+		return &ServerStatusDetail{
+			ServerStatus: ServerStatus{
+				ServerID:  serverID,
+				CheckedAt: time.Now(),
+				Error:     "服务器正在被检查，请稍后再试",
+			},
+		}
 	}
 	defer lock.Unlock()
 
@@ -41,13 +54,20 @@ func checkServer(serverID int64) {
 	server, err := GetServerByID(serverID)
 	if err != nil {
 		log.Printf("获取服务器 %d 信息失败: %v", serverID, err)
-		return
+		return &ServerStatusDetail{
+			ServerStatus: ServerStatus{
+				ServerID:  serverID,
+				CheckedAt: time.Now(),
+				Error:     "获取服务器信息失败: " + err.Error(),
+			},
+		}
 	}
 
 	log.Printf("开始检查服务器 %d (%s)", serverID, server.Host)
 
 	client := NewSSHClient(server.Host, server.Port, server.Username, server.Password)
 	if err := client.Connect(); err != nil {
+		log.Printf("服务器 %d (%s) SSH 连接失败: %v", serverID, server.Host, err)
 		// 保存错误状态
 		status := &ServerStatusDetail{
 			ServerStatus: ServerStatus{
@@ -55,6 +75,7 @@ func checkServer(serverID int64) {
 				Host:      server.Host,
 				Username:  server.Username,
 				CheckedAt: time.Now(),
+				Error:     "连接失败: " + err.Error(),
 			},
 			Disks:    []DiskInfo{},
 			Services: []ServiceStatus{},
@@ -65,20 +86,21 @@ func checkServer(serverID int64) {
 		statusCache[serverID] = status
 		statusCacheMu.Unlock()
 
-		// 异步写入数据库
-		go func(s *ServerStatusDetail) {
-			if err := SaveServerStatus(s); err != nil {
-				log.Printf("服务器 %d 状态写入数据库失败: %v", s.ServerID, err)
-			}
-		}(status)
-		return
+		// 同步写入数据库，确保数据立即持久化
+		if err := SaveServerStatus(status); err != nil {
+			log.Printf("服务器 %d 状态写入数据库失败: %v", serverID, err)
+		}
+		return status
 	}
 	defer client.Close()
 
 	// 获取系统信息
 	sysInfo, err := client.GetAllSystemInfo()
 	if err != nil {
-		sysInfo = &SystemInfo{}
+		log.Printf("服务器 %d (%s) 获取系统信息失败: %v", serverID, server.Host, err)
+		if sysInfo == nil {
+			sysInfo = &SystemInfo{}
+		}
 	}
 
 	// 解析CPU使用率（去掉%符号）
@@ -141,6 +163,9 @@ func checkServer(serverID int64) {
 		Disks:    diskInfos,
 		Services: serviceStatuses,
 	}
+	if err != nil {
+		status.Error = "采集失败: " + err.Error()
+	}
 
 	// 先写入内存缓存（页面会从这里读取）
 	statusCacheMu.Lock()
@@ -148,10 +173,14 @@ func checkServer(serverID int64) {
 	statusCacheMu.Unlock()
 	log.Printf("服务器 %d 状态已写入内存缓存", serverID)
 
-	// 异步写入数据库
-	go func(s *ServerStatusDetail) {
-		if err := SaveServerStatus(s); err != nil {
-			log.Printf("服务器 %d 状态写入数据库失败: %v", s.ServerID, err)
-		}
-	}(status)
+	// 同步写入数据库，确保数据立即持久化
+	if err := SaveServerStatus(status); err != nil {
+		log.Printf("服务器 %d 状态写入数据库失败: %v", serverID, err)
+	}
+	return status
+}
+
+// checkServer 异步检查服务器状态（兼容旧调用）
+func checkServer(serverID int64) {
+	_ = checkServerSync(serverID)
 }

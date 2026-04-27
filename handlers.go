@@ -190,12 +190,14 @@ func serverDetailHandler(w http.ResponseWriter, r *http.Request) {
 		MountedOn string             `json:"mountedOn"`
 		Points    []DiskHistoryPoint `json:"points"`
 	}
-	var diskHistories []DiskHistory
+	diskHistories := []DiskHistory{}
 
 	// 获取所有唯一的挂载点
 	mountPoints := make(map[string]bool)
-	for _, d := range latestStatus.Disks {
-		mountPoints[d.MountedOn] = true
+	if latestStatus != nil {
+		for _, d := range latestStatus.Disks {
+			mountPoints[d.MountedOn] = true
+		}
 	}
 
 	for mountPoint := range mountPoints {
@@ -270,6 +272,7 @@ func serverStatusAPIHandler(w http.ResponseWriter, r *http.Request) {
 		Disks      []DiskInfo      `json:"Disks"`
 		Services   []ServiceStatus `json:"Services"`
 		CheckedAt  time.Time       `json:"CheckedAt"`
+		Error      string          `json:"Error"`
 	}{
 		CPUUsage:   status.CPUUsage,
 		MemUsage:   status.MemUsage,
@@ -280,6 +283,7 @@ func serverStatusAPIHandler(w http.ResponseWriter, r *http.Request) {
 		Disks:      status.Disks,
 		Services:   status.Services,
 		CheckedAt:  status.CheckedAt,
+		Error:      status.Error,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -384,11 +388,51 @@ func serversAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// checkServerHandler 检查单个服务器
+// checkServerHandler 检查单个服务器（异步）
 func checkServerHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
 	go checkServer(id)
 	w.Write([]byte("OK"))
+}
+
+// checkServerSyncHandler 同步检查单个服务器并返回结果
+func checkServerSyncHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "无效的服务器ID", http.StatusBadRequest)
+		return
+	}
+
+	status := checkServerSync(id)
+
+	// 转换为前端期望的字段名
+	resp := struct {
+		CPUUsage   float64         `json:"CPU"`
+		MemUsage   float64         `json:"MemUsage"`
+		NetRXBytes int64           `json:"NetRXBytes"`
+		NetTXBytes int64           `json:"NetTXBytes"`
+		NetRXSpeed float64         `json:"NetRXSpeed"`
+		NetTXSpeed float64         `json:"NetTXSpeed"`
+		Disks      []DiskInfo      `json:"Disks"`
+		Services   []ServiceStatus `json:"Services"`
+		CheckedAt  time.Time       `json:"CheckedAt"`
+		Error      string          `json:"Error"`
+	}{
+		CPUUsage:   status.CPUUsage,
+		MemUsage:   status.MemUsage,
+		NetRXBytes: status.NetRXBytes,
+		NetTXBytes: status.NetTXBytes,
+		NetRXSpeed: status.NetRXSpeed,
+		NetTXSpeed: status.NetTXSpeed,
+		Disks:      status.Disks,
+		Services:   status.Services,
+		CheckedAt:  status.CheckedAt,
+		Error:      status.Error,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 // checkAllServersHandler 检查所有服务器

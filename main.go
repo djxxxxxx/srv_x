@@ -57,6 +57,7 @@ func main() {
 	http.HandleFunc("/api/servers", authMiddleware(serversAPIHandler))
 	http.HandleFunc("/api/server/status", authMiddleware(serverStatusAPIHandler))
 	http.HandleFunc("/api/server/check", authMiddleware(checkServerHandler))
+	http.HandleFunc("/api/server/check-sync", authMiddleware(checkServerSyncHandler))
 	http.HandleFunc("/api/server/checkall", authMiddleware(checkAllServersHandler))
 	http.HandleFunc("/api/server/checking-count", authMiddleware(checkingCountHandler))
 	http.HandleFunc("/api/server/export", authMiddleware(exportHandler))
