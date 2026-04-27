@@ -1,4 +1,4 @@
-# Server Monitor
+# Server Monitor / 服务器监控
 
 > **Vibe Coding Project** — 初始版本由 [通义灵码](https://tongyi.aliyun.com/lingma) 生成，后期由 [Kimi](https://kimi.moonshot.cn) 参与优化与迭代。
 
@@ -33,7 +33,7 @@
 
 ```bash
 # 克隆仓库
-git clone <repository-url>
+git clone https://github.com/djxxxxxx/srv_x.git
 cd srv_x
 
 # 直接运行
@@ -49,26 +49,24 @@ go build -o server-monitor .
 - 默认管理员账号：`admin`
 - 默认管理员密码：`admin123`
 
-## 项目结构
+### ⚠️ 重要：部署须知
+
+本项目使用 Go 标准库的 `html/template` 渲染前端页面，**`templates/` 目录必须与可执行文件位于同一目录下**。
+
+**正确目录结构示例：**
 
 ```
-.
-├── main.go              # 程序入口、路由注册、session 管理
-├── db.go                # SQLite 数据库操作
-├── handlers.go          # HTTP 请求处理器
-├── middleware.go        # 认证与权限中间件
-├── ssh.go               # SSH 客户端与系统信息采集
-├── monitor.go           # 状态检查调度
-├── scheduler.go         # 定时任务
-├── crypto.go            # 密码哈希与加密
-├── template.go          # HTML 模板渲染
-├── utils.go             # 工具函数
-└── templates/           # HTML 模板文件
-    ├── login.html
-    ├── dashboard.html
-    ├── server_detail.html
-    └── users.html
+/opt/srv_x/
+├── server-monitor      <-- 可执行文件
+├── templates/
+│   ├── login.html
+│   ├── dashboard.html
+│   ├── server_detail.html
+│   └── users.html
+└── monitor.db          <-- 运行时自动生成
 ```
+
+若 `templates/` 目录缺失或路径不正确，启动后会报 "template not found" 错误。
 
 ## 交叉编译
 
@@ -83,6 +81,27 @@ GOOS=windows GOARCH=amd64 go build -o server-monitor.exe .
 
 # macOS
 GOOS=darwin GOARCH=amd64 go build -o server-monitor .
+```
+
+## 项目结构
+
+```
+.
+├── main.go              # 程序入口、路由注册、session 管理
+├── db.go                # SQLite 数据库操作
+├── handlers.go          # HTTP 请求处理器
+├── middleware.go        # 认证与权限中间件
+├── ssh.go               # SSH 客户端与系统信息采集
+├── monitor.go           # 状态检查调度
+├── scheduler.go         # 定时任务
+├── crypto.go            # 密码哈希与加密
+├── template.go          # HTML 模板渲染
+├── utils.go             # 工具函数
+└── templates/           # HTML 模板文件（运行时必须存在）
+    ├── login.html
+    ├── dashboard.html
+    ├── server_detail.html
+    └── users.html
 ```
 
 ## 安全提示
