@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>用户管理 - 服务器监测系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #2d2d2d;
+            color: #e0e0e0;
+            font-size: 14px;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #444;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-right span {
+            color: #aaa;
+        }
+
+        .header-right a {
+            color: #4a9eff;
+            text-decoration: none;
+        }
+
+        .header-right a:hover {
+            text-decoration: underline;
+        }
+
+        .toolbar {
+            padding: 10px 20px;
+            background: #252525;
+            border-bottom: 1px solid #444;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #555;
+            background: #3a3a3a;
+            color: #e0e0e0;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .btn:hover {
+            background: #4a4a4a;
+        }
+
+        .btn-primary {
+            background: #4a9eff;
+            border-color: #4a9eff;
+        }
+
+        .btn-primary:hover {
+            background: #5aaaff;
+        }
+
+        .btn-danger {
+            background: #ff4a4a;
+            border-color: #ff4a4a;
+        }
+
+        .btn-danger:hover {
+            background: #ff5a5a;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .user-table th,
+        .user-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #444;
+        }
+
+        .user-table th {
+            background: #2a2a2a;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .user-table tr:hover {
+            background: #3a3a3a;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .role-admin {
+            background: #ff9800;
+            color: #000;
+        }
+
+        .role-user {
+            background: #4caf50;
+            color: #fff;
+        }
+
+        .role-guest {
+            background: #9e9e9e;
+            color: #000;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 5px;
+        }
+
+        .action-btns .btn {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #333;
+            padding: 20px;
+            border-radius: 4px;
+            width: 400px;
+            max-width: 90%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            font-size: 16px;
+            color: #fff;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #555;
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border-radius: 3px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .info-box {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .info-box h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #4a9eff;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .info-box li {
+            margin-bottom: 5px;
+        }
+
+        .readonly-view {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .readonly-view h2 {
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        .readonly-view p {
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main-container">
+        <div class="header">
+            <h1>用户管理</h1>
+            <div class="header-right">
+                <span>用户: {{.Username}} ({{.Role}})</span>
+                <a href="/dashboard">返回监控</a>
+                <a href="/logout">退出</a>
+            </div>
+        </div>
+
+        {{if eq .Role "guest"}}
+        <!-- Guest 只读视图 -->
+        <div class="content">
+            <div class="readonly-view">
+                <h2>只读访问</h2>
+                <p>您的账户 ({{.Username}}) 没有管理权限</p>
+            </div>
+        </div>
+        {{else}}
+        <div class="content">
+            {{if eq .Role "admin"}}
+            <!-- Admin 权限说明 -->
+            <div class="info-box">
+                <h3>权限说明</h3>
+                <ul>
+                    <li><strong>admin</strong> - 可以增删改查所有用户，修改任何用户密码</li>
+                    <li><strong>user</strong> - 可以修改自己的密码</li>
+                    <li><strong>guest</strong> - 只读，无法修改任何内容</li>
+                </ul>
+            </div>
+
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="showAddModal()">新增用户</button>
+            </div>
+            {{end}}
+
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>用户名</th>
+                        <th>角色</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Users}}
+                    <tr>
+                        <td>{{.ID}}</td>
+                        <td>{{.Username}}</td>
+                        <td>
+                            <span class="role-badge role-{{.Role}}">{{.Role}}</span>
+                        </td>
+                        <td>
+                            <div class="action-btns">
+                                {{if eq $.Role "admin"}}
+                                <button class="btn"
+                                    onclick="showEditModal({{.ID}}, '{{.Username}}', '{{.Role}}')">编辑</button>
+                                <button class="btn"
+                                    onclick="showChangePasswordModal({{.ID}}, '{{.Username}}')">改密</button>
+                                {{if ne $.Username .Username}}
+                                <button class="btn btn-danger" onclick="deleteUser({{.ID}})">删除</button>
+                                {{end}}
+                                {{else}}
+                                {{if eq $.Username .Username}}
+                                <button class="btn"
+                                    onclick="showChangePasswordModal({{.ID}}, '{{.Username}}')">修改密码</button>
+                                {{end}}
+                                {{end}}
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{end}}
+    </div>
+
+    <!-- 添加/编辑用户 Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">添加用户</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group" id="passwordGroup">
+                    <label>密码</label>
+                    <input type="password" id="password">
+                    <small id="passwordHint" style="color: #666;">编辑时留空表示不修改密码</small>
+                </div>
+                <div class="form-group">
+                    <label>角色</label>
+                    <select id="role">
+                        <option value="admin">admin</option>
+                        <option value="user">user</option>
+                        <option value="guest">guest</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 修改密码 Modal -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>修改密码</h2>
+                <button class="close-btn" onclick="closePasswordModal()">&times;</button>
+            </div>
+            <form id="passwordForm">
+                <input type="hidden" id="passwordUserId">
+                <p style="margin-bottom: 15px; color: #aaa;">正在修改用户: <strong id="passwordUsername"></strong></p>
+
+                {{if eq .Role "admin"}}
+                <!-- Admin 修改他人密码不需要旧密码 -->
+                <div id="oldPasswordGroup" style="display: none;">
+                    {{else}}
+                    <div id="oldPasswordGroup">
+                        {{end}}
+                        <div class="form-group">
+                            <label>旧密码</label>
+                            <input type="password" id="oldPassword" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>新密码</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label>确认新密码</label>
+                        <input type="password" id="confirmPassword" required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" onclick="closePasswordModal()">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const currentRole = '{{.Role}}';
+        const currentUsername = '{{.Username}}';
+
+        // User Modal
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = '添加用户';
+            document.getElementById('userId').value = '';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('role').value = 'user';
+            document.getElementById('passwordGroup').style.display = 'block';
+            document.getElementById('passwordGroup').querySelector('label').textContent = '密码';
+            document.getElementById('password').required = true;
+            document.getElementById('passwordHint').style.display = 'none';
+            document.getElementById('userModal').classList.add('active');
+        }
+
+        function showEditModal(id, username, role) {
+            document.getElementById('modalTitle').textContent = '编辑用户';
+            document.getElementById('userId').value = id;
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = '';
+            document.getElementById('role').value = role;
+            document.getElementById('passwordGroup').style.display = 'none';
+            document.getElementById('password').required = false;
+            document.getElementById('passwordHint').style.display = 'none';
+            document.getElementById('userModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('userModal').classList.remove('active');
+        }
+
+        document.getElementById('userForm').onsubmit = function (e) {
+            e.preventDefault();
+            const id = document.getElementById('userId').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+
+            const params = new URLSearchParams();
+            params.append('username', username);
+            params.append('role', role);
+            if (password) {
+                params.append('password', password);
+            }
+
+            const method = id ? 'PUT' : 'POST';
+            if (id) {
+                params.append('id', id);
+            }
+
+            fetch('/api/users', {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: params
+            }).then(res => {
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    res.text().then(text => alert('操作失败: ' + text));
+                }
+            });
+        };
+
+        // Password Modal
+        function showChangePasswordModal(userId, username) {
+            document.getElementById('passwordUserId').value = userId;
+            document.getElementById('passwordUsername').textContent = username;
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+
+            // Admin 修改他人密码不需要旧密码
+            const isSelf = username === currentUsername;
+            const oldPasswordGroup = document.getElementById('oldPasswordGroup');
+            if (currentRole === 'admin' && !isSelf) {
+                oldPasswordGroup.style.display = 'none';
+                document.getElementById('oldPassword').required = false;
+            } else {
+                oldPasswordGroup.style.display = 'block';
+                document.getElementById('oldPassword').required = true;
+            }
+
+            document.getElementById('passwordModal').classList.add('active');
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.remove('active');
+        }
+
+        document.getElementById('passwordForm').onsubmit = function (e) {
+            e.preventDefault();
+            const userId = document.getElementById('passwordUserId').value;
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (newPassword !== confirmPassword) {
+                alert('两次输入的新密码不一致');
+                return;
+            }
+
+            const params = new URLSearchParams();
+            params.append('userId', userId);
+            if (oldPassword) {
+                params.append('oldPassword', oldPassword);
+            }
+            params.append('newPassword', newPassword);
+
+            // Admin 直接修改其他用户密码使用 users API
+            const isSelf = document.getElementById('passwordUsername').textContent === currentUsername;
+            if (currentRole === 'admin' && !isSelf) {
+                // Admin 修改他人密码，直接使用 PUT
+                const userParams = new URLSearchParams();
+                userParams.append('id', userId);
+                userParams.append('username', document.getElementById('passwordUsername').textContent);
+                userParams.append('password', newPassword);
+                userParams.append('role', ''); // 保持不变
+
+                fetch('/api/users', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: userParams
+                }).then(res => {
+                    if (res.ok) {
+                        alert('密码修改成功');
+                        closePasswordModal();
+                    } else {
+                        res.text().then(text => alert('修改失败: ' + text));
+                    }
+                });
+            } else {
+                // 自己修改密码需要验证旧密码
+                fetch('/api/users/password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: params
+                }).then(res => {
+                    if (res.ok) {
+                        alert('密码修改成功');
+                        closePasswordModal();
+                    } else {
+                        res.text().then(text => alert('修改失败: ' + text));
+                    }
+                });
+            }
+        };
+
+        function deleteUser(id) {
+            if (!confirm('确定要删除该用户吗？')) return;
+
+            fetch('/api/users?id=' + encodeURIComponent(id), {
+                method: 'DELETE'
+            }).then(res => {
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    res.text().then(text => alert('删除失败: ' + text));
+                }
+            });
+        }
+
+        // 点击 modal 外部关闭
+        window.onclick = function (e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('active');
+            }
+        };
+    </script>
+</body>
+
+</html>

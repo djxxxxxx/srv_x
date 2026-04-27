@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务器详情 - {{.Server.Host}}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #2d2d2d;
+            min-height: 100vh;
+            color: #e0e0e0;
+            font-size: 12px;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px 15px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #444;
+        }
+
+        .header h1 {
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .header .info {
+            color: #888;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .back-btn {
+            background: #3a3a3a;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            padding: 4px 10px;
+            border-radius: 3px;
+            text-decoration: none;
+            font-size: 11px;
+        }
+
+        .back-btn:hover {
+            background: #4a4a4a;
+        }
+
+        .time-selector {
+            background: #252525;
+            padding: 8px 15px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .time-selector label {
+            color: #888;
+            font-size: 11px;
+        }
+
+        .time-selector select {
+            background: #3a3a3a;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .time-selector select:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 10px;
+            padding: 0 10px;
+        }
+
+        .stat-item {
+            background: #252525;
+            border-radius: 4px;
+            padding: 8px;
+            border: 1px solid #444;
+            text-align: center;
+        }
+
+        .stat-item .label {
+            color: #888;
+            font-size: 10px;
+            margin-bottom: 4px;
+        }
+
+        .stat-item .value {
+            color: #4a9eff;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 0 10px;
+        }
+
+        .chart-card {
+            background: #252525;
+            border-radius: 4px;
+            padding: 10px;
+            border: 1px solid #444;
+        }
+
+        .disk-history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 10px;
+        }
+
+        .disk-history-section {
+            background: #252525;
+            border-radius: 4px;
+            padding: 10px;
+            border: 1px solid #444;
+        }
+
+        .disk-history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 10px;
+        }
+
+        .disk-history-card {
+            background: #1a1a1a;
+            border-radius: 4px;
+            padding: 8px;
+        }
+
+        .disk-history-card h4 {
+            color: #888;
+            font-size: 10px;
+            margin-bottom: 6px;
+            font-weight: normal;
+        }
+
+        .disk-history-chart {
+            height: 120px;
+        }
+
+        .chart-card h3 {
+            color: #888;
+            font-size: 11px;
+            margin-bottom: 8px;
+            font-weight: normal;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 160px;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 50px 20px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>{{.Server.Host}}</h1>
+                <div class="info">用户名: {{.Server.Username}} | 服务: {{.Server.Services}}</div>
+            </div>
+            <a href="/dashboard" class="back-btn">← 返回列表</a>
+        </div>
+
+        <div class="time-selector">
+            <label>追溯时长：</label>
+            <select id="timeRange" onchange="updateCharts()">
+                <option value="1">最近1小时</option>
+                <option value="6">最近6小时</option>
+                <option value="24" selected>最近24小时</option>
+                <option value="72">最近3天</option>
+                <option value="168">最近7天</option>
+                <option value="720">最近30天</option>
+                <option value="all">全部历史</option>
+            </select>
+        </div>
+
+        <!-- HistoryJSON: {{.HistoryJSON}} -->
+        {{if ne .HistoryJSON "[]"}}
+        <div class="stats-summary" id="statsSummary">
+            <div class="stat-item">
+                <div class="label">CPU 平均</div>
+                <div class="value" id="cpuAvg">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">内存平均</div>
+                <div class="value" id="memAvg">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">磁盘平均</div>
+                <div class="value" id="diskAvg">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">记录条数</div>
+                <div class="value" id="recordCount">-</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>CPU 使用率趋势</h3>
+                <div class="chart-container"><canvas id="cpuChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>内存使用趋势</h3>
+                <div class="chart-container"><canvas id="memoryChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>磁盘使用趋势</h3>
+                <div class="chart-container"><canvas id="diskChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>网络 IO 趋势</h3>
+                <div class="chart-container"><canvas id="networkChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- 各挂载点余量历史趋势 -->
+        {{if ne .DiskHistoryJSON "[]"}}
+        <div class="disk-history-section" style="margin-top: 10px;">
+            <h3 style="color: #888; font-size: 11px; margin: 10px; font-weight: normal;">各挂载点余量历史趋势 (GB)</h3>
+            <div class="disk-history-grid" id="diskHistoryGrid"></div>
+        </div>
+        {{end}}
+        {{else}}
+        <div class="no-data">
+            <p>暂无历史记录，请等待系统自动巡检或手动更新</p>
+        </div>
+        {{end}}
+    </div>
+
+    <script id="history-data" type="application/json">{{.HistoryJSON}}</script>
+    <script id="disk-history-data" type="application/json">{{.DiskHistoryJSON}}</script>
+    <script>
+        const rawHistory = JSON.parse(document.getElementById('history-data').textContent);
+        const diskHistoryData = JSON.parse(document.getElementById('disk-history-data').textContent);
+        let charts = {};
+
+        // 新的数据格式已经是数值，直接返回
+        function parseValue(val) {
+            if (val === null || val === undefined) return null;
+            return parseFloat(val);
+        }
+
+        // 磁盘使用率现在也是数值
+        function parseDisk(val) {
+            if (val === null || val === undefined) return null;
+            return parseFloat(val);
+        }
+
+        // 网络速度直接返回对象
+        function parseNetwork(item) {
+            return { 
+                in: item.NetRXSpeed || 0, 
+                out: item.NetTXSpeed || 0 
+            };
+        }
+
+        function filterData(hours) {
+            if (hours === 'all') return rawHistory;
+            const cutoff = new Date();
+            cutoff.setHours(cutoff.getHours() - parseInt(hours));
+            return rawHistory.filter(item => new Date(item.CheckedAt) >= cutoff);
+        }
+
+        function updateStats(data) {
+            document.getElementById('recordCount').textContent = data.length;
+            const cpuValues = data.map(item => parseValue(item.CPU)).filter(v => v !== null);
+            const memValues = data.map(item => parseValue(item.MemUsage)).filter(v => v !== null);
+            const diskValues = data.map(item => parseDisk(item.DiskUsage)).filter(v => v !== null);
+            document.getElementById('cpuAvg').textContent = cpuValues.length ? (cpuValues.reduce((a, b) => a + b, 0) / cpuValues.length).toFixed(1) + '%' : '-';
+            document.getElementById('memAvg').textContent = memValues.length ? (memValues.reduce((a, b) => a + b, 0) / memValues.length).toFixed(1) + '%' : '-';
+            document.getElementById('diskAvg').textContent = diskValues.length ? (diskValues.reduce((a, b) => a + b, 0) / diskValues.length).toFixed(1) + '%' : '-';
+        }
+
+        function createLineChart(canvasId, labels, tooltipLabels, data, label, color, min, max) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255,255,255,0.2)',
+                            borderWidth: 1,
+                            callbacks: {
+                                title: (tooltipItems) => tooltipLabels[tooltipItems[0].dataIndex]
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#888', maxRotation: 0, autoSkip: false }
+                        },
+                        y: {
+                            min: min, max: max,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#888' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createNetworkChart(canvasId, labels, tooltipLabels, data) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '入站 (KB/s)',
+                            data: data.map(d => d.in),
+                            borderColor: '#66bb6a',
+                            backgroundColor: '#66bb6a20',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2
+                        },
+                        {
+                            label: '出站 (KB/s)',
+                            data: data.map(d => d.out),
+                            borderColor: '#ef5350',
+                            backgroundColor: '#ef535020',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { labels: { color: '#e0e0e0' } },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255,255,255,0.2)',
+                            borderWidth: 1,
+                            callbacks: {
+                                title: (tooltipItems) => tooltipLabels[tooltipItems[0].dataIndex]
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#888', maxRotation: 0, autoSkip: false }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#888' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCharts() {
+            const hours = document.getElementById('timeRange').value;
+            const data = filterData(hours);
+            updateStats(data);
+
+            if (data.length === 0) return;
+
+            // 判断是否为以天为单位的范围
+            const isDayRange = hours === '72' || hours === '168' || hours === '720' || hours === 'all';
+
+            // 准备标签和tooltip数据
+            const labels = data.map(item => {
+                const date = new Date(item.CheckedAt);
+
+                if (isDayRange) {
+                    // 以天为单位时，只在17点显示日期，其他节点不显示
+                    const hour = date.getHours();
+                    if (hour === 17) {
+                        return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+                    } else {
+                        return ''; // 不显示X轴标签
+                    }
+                } else {
+                    // 以小时为单位时，显示时间
+                    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                }
+            }).reverse();
+
+            // 准备tooltip用的完整时间标签
+            const tooltipLabels = data.map(item => {
+                const date = new Date(item.CheckedAt);
+                return date.toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            }).reverse();
+
+            const cpuData = data.map(item => parseValue(item.CPU)).reverse();
+            const memoryData = data.map(item => parseValue(item.MemUsage)).reverse();
+            const diskData = data.map(item => parseDisk(item.DiskUsage)).reverse();
+            const networkData = data.map(item => parseNetwork(item)).reverse();
+
+            // 销毁旧图表（只销毁主图表，不包括 diskHistory 数组）
+            ['cpu', 'memory', 'disk', 'network'].forEach(key => {
+                if (charts[key] && charts[key].destroy) {
+                    charts[key].destroy();
+                }
+            });
+
+            charts.cpu = createLineChart('cpuChart', labels, tooltipLabels, cpuData, 'CPU %', '#4fc3f7', 0, 100);
+            charts.memory = createLineChart('memoryChart', labels, tooltipLabels, memoryData, '内存 %', '#66bb6a', 0, 100);
+            charts.disk = createLineChart('diskChart', labels, tooltipLabels, diskData, '磁盘 %', '#ffa726', 0, 100);
+            charts.network = createNetworkChart('networkChart', labels, tooltipLabels, networkData);
+
+            // 渲染各挂载点余量历史图表
+            renderDiskHistoryCharts(hours);
+        }
+
+        function renderDiskHistoryCharts(hours) {
+            const container = document.getElementById('diskHistoryGrid');
+            if (!container || !diskHistoryData || diskHistoryData.length === 0) return;
+
+            // 清空现有内容
+            container.innerHTML = '';
+
+            // 销毁旧的磁盘历史图表
+            if (charts.diskHistory) {
+                charts.diskHistory.forEach(c => c.destroy());
+            }
+            charts.diskHistory = [];
+
+            const cutoff = hours === 'all' ? 0 : Date.now() - parseInt(hours) * 60 * 60 * 1000;
+
+            diskHistoryData.forEach((disk, index) => {
+                if (!disk.points || disk.points.length === 0) return;
+
+                // 过滤数据
+                const filtered = disk.points.filter(p => {
+                    if (hours === 'all') return true;
+                    return new Date(p.checkedAt).getTime() >= cutoff;
+                });
+
+                if (filtered.length === 0) return;
+
+                // 创建卡片
+                const card = document.createElement('div');
+                card.className = 'disk-history-card';
+                card.innerHTML = `
+                    <h4>${disk.mountedOn}</h4>
+                    <div class="disk-history-chart">
+                        <canvas id="diskHistoryChart_${index}"></canvas>
+                    </div>
+                `;
+                container.appendChild(card);
+
+                // 准备数据
+                const isDayRangeDisk = hours === '72' || hours === '168' || hours === '720' || hours === 'all';
+
+                // X轴标签
+                const labels = filtered.map(p => {
+                    const date = new Date(p.checkedAt);
+
+                    if (isDayRangeDisk) {
+                        // 以天为单位时，只在17点显示日期，其他节点不显示
+                        const hour = date.getHours();
+                        if (hour === 17) {
+                            return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+                        } else {
+                            return ''; // 不显示X轴标签
+                        }
+                    } else {
+                        // 以小时为单位时，显示时间
+                        return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                    }
+                });
+
+                // tooltip用的完整时间标签
+                const tooltipLabels = filtered.map(p => {
+                    const date = new Date(p.checkedAt);
+                    return date.toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                });
+
+                const data = filtered.map(p => p.available);
+
+                // 创建图表
+                const ctx = document.getElementById(`diskHistoryChart_${index}`).getContext('2d');
+                const chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '余量 (GB)',
+                            data: data,
+                            borderColor: '#66bb6a',
+                            backgroundColor: '#66bb6a20',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(0,0,0,0.8)',
+                                titleColor: '#fff',
+                                bodyColor: '#fff',
+                                borderColor: 'rgba(255,255,255,0.2)',
+                                borderWidth: 1,
+                                callbacks: {
+                                    title: (tooltipItems) => tooltipLabels[tooltipItems[0].dataIndex],
+                                    label: (ctx) => `余量: ${ctx.parsed.y.toFixed(2)} GB`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                ticks: { color: '#888', maxTicksLimit: 4, maxRotation: 0, font: { size: 9 } }
+                            },
+                            y: {
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                ticks: { color: '#888', font: { size: 9 } }
+                            }
+                        }
+                    }
+                });
+                charts.diskHistory.push(chart);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', updateCharts);
+    </script>
+</body>
+
+</html>

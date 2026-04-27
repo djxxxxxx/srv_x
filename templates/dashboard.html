@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>服务器监测系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #2d2d2d;
+            color: #e0e0e0;
+            font-size: 12px;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .scrollable-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        /* 滚动条样式 */
+        .scrollable-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .scrollable-content::-webkit-scrollbar-track {
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
+
+        .scrollable-content::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        .scrollable-content::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #444;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-right span {
+            color: #aaa;
+        }
+
+        .header-right a {
+            color: #4a9eff;
+            text-decoration: none;
+        }
+
+        .header-right a:hover {
+            text-decoration: underline;
+        }
+
+        .toolbar {
+            padding: 10px 20px;
+            background: #252525;
+            border-bottom: 1px solid #444;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #555;
+            background: #3a3a3a;
+            color: #e0e0e0;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .btn:hover {
+            background: #4a4a4a;
+        }
+
+        .btn-primary {
+            background: #4a9eff;
+            border-color: #4a9eff;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #3a8eef;
+        }
+
+        .btn-success {
+            background: #5cb85c;
+            border-color: #5cb85c;
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #4cae4c;
+        }
+
+        .btn-info {
+            background: #5bc0de;
+        }
+
+        .btn-info:hover {
+            background: #46b8da;
+        }
+
+        .server-list {
+            padding: 10px;
+        }
+
+        .server-row {
+            display: grid;
+            grid-template-columns: 200px 380px 1fr 100px;
+            gap: 15px;
+            padding: 8px 12px;
+            background: #363636;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            align-items: start;
+        }
+
+        .server-row:hover {
+            background: #404040;
+        }
+
+        .col-info {
+            line-height: 1.6;
+            white-space: nowrap;
+        }
+
+        .col-info .label {
+            color: #888;
+            display: inline-block;
+            width: 45px;
+        }
+
+        .col-disks {
+            line-height: 1.6;
+            font-size: 11px;
+        }
+
+        .disk-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+        }
+
+        .disk-item .disk-mount {
+            color: #aaa;
+        }
+
+        .disk-item .disk-usage {
+            text-align: right;
+            font-family: monospace;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .progress-bar-wrapper {
+            width: 60px;
+            flex-shrink: 0;
+        }
+
+        .usage-info {
+            display: inline-block;
+            width: 90px;
+            text-align: right;
+            color: #aaa;
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+
+        .percent-fixed {
+            display: inline-block;
+            width: 35px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .progress-bar {
+            width: 60px;
+            height: 10px;
+            background: #2a2a2a;
+            border-radius: 5px;
+            overflow: hidden;
+            display: inline-block;
+            border: 1px solid #666;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            display: block;
+        }
+
+        .progress-fill.low {
+            background-color: #22c55e !important;
+            background-image: none !important;
+        }
+
+        .progress-fill.medium {
+            background-color: #eab308 !important;
+            background-image: none !important;
+        }
+
+        .progress-fill.high {
+            background-color: #ef4444 !important;
+            background-image: none !important;
+        }
+
+        .col-services {
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .service-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .service-name {
+            width: 70px;
+            text-align: right;
+        }
+
+        .service-detail {
+            margin-left: 6px;
+            color: #aaa;
+            font-size: 10px;
+        }
+
+        .service-instance {
+            padding-left: 74px;
+            font-size: 10px;
+            color: #888;
+            line-height: 1.4;
+            display: flex;
+            gap: 8px;
+        }
+
+        .instance-name {
+            width: 120px;
+            text-align: left;
+        }
+
+        .instance-status {
+            color: #aaa;
+        }
+
+        .service-tag {
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #555;
+        }
+
+        .service-tag.running {
+            background: #5cb85c;
+            color: #fff;
+        }
+
+        .service-tag.stopped {
+            background: #d9534f;
+            color: #fff;
+        }
+
+        .col-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .col-actions .btn {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #888;
+        }
+
+        /* 弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #363636;
+            padding: 20px;
+            border-radius: 6px;
+            width: 400px;
+        }
+
+        .modal-header {
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #555;
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border-radius: 3px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main-container">
+        <div class="header">
+            <h1>服务器监测系统</h1>
+            <div class="header-right">
+                <span>用户: {{.Username}}</span>
+                <a href="/users">用户管理</a>
+                <a href="/logout">退出</a>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            {{if eq .Role "admin"}}
+            <button class="btn btn-primary" onclick="showModal()">新增</button>
+            {{end}}
+            <button class="btn btn-success" onclick="checkAll()">全量更新</button>
+            <button class="btn" onclick="exportCSV()">导出CSV</button>
+        </div>
+
+        <div class="scrollable-content">
+            <div class="server-list-container">
+                {{if .Servers}}
+                {{range .Servers}}
+                <div class="server-row" data-id="{{.ID}}">
+                    <div class="col-info">
+                        {{$status := index $.Status .ID}}
+                        <div><span class="label">IP:</span> {{.Host}}:{{.Port}}</div>
+                        <div><span class="label">用户:</span> {{.Username}}</div>
+                        <div class="col-cpu"><span class="label">CPU:</span> {{if $status}}{{progressBar $status.CPUUsage}}{{printf " %.1f%%" $status.CPUUsage}}{{else}}未检查{{end}}
+                        </div>
+                        <div class="col-memory"><span class="label">内存:</span> {{if $status}}{{progressBar $status.MemUsage}}{{printf " %.1f%%" $status.MemUsage}}{{else}}未检查{{end}}</div>
+                        <div class="col-network"><span class="label">网络:</span> {{if $status}}<br>总量: RX {{formatBytes $status.NetRXBytes}} / TX {{formatBytes $status.NetTXBytes}}<br>瞬时: ↓ {{printf "%.2f" $status.NetRXSpeed}} KB/s ↑ {{printf "%.2f" $status.NetTXSpeed}} KB/s{{else}}未检查{{end}}
+                        </div>
+                        {{if $status}}
+                        <div class="col-time" style="margin-top: 8px; font-size: 10px; color: #888;">
+                            <span class="label">更新:</span> {{$status.CheckedAt.Format "2006-01-02 15:04:05"}}
+                        </div>
+                        {{end}}
+                    </div>
+                    <div class="col-disks">
+                        {{if $status}}
+                        {{range $status.Disks}}
+                        <div class="disk-item">
+                            <span class="disk-mount">{{.MountedOn}}</span>
+                            <span class="disk-usage">{{progressBar .UsagePercent}} <span class="usage-info">{{printf "%.1f/%.1fG" (sub .TotalGB .UsedGB) .TotalGB}}</span> <span class="percent-fixed">{{printf "%.0f%%" .UsagePercent}}</span></span>
+                        </div>
+                        {{end}}
+                        {{else}}
+                        未检查
+                        {{end}}
+                    </div>
+                    <div class="col-services">
+                        {{if $status}}
+                        {{range $status.Services}}
+                        <div class="service-item"><span class="service-name">{{.Name}}:</span>{{serviceTag .Status}}</div>
+                        {{if eq .Name "oracle"}}{{if .Detail}}{{range split .Detail "|"}}{{if .}}{{$parts := split . "::"}}{{if ge (len $parts) 2}}<div class="service-instance"><span class="instance-name">{{index $parts 0}}:</span><span class="instance-status">{{index $parts 1}}</span></div>{{end}}{{end}}{{end}}{{end}}{{end}}
+                        {{end}}
+                        {{else}}
+                        未检查
+                        {{end}}
+                    </div>
+                    <div class="col-actions">
+                        <button class="btn btn-success" onclick="checkServer({{.ID}})">更新</button>
+                        <button class="btn btn-info" onclick="viewDetail({{.ID}})">详情</button>
+                        {{if eq $.Role "admin"}}
+                        <button class="btn"
+                            onclick="editServer({{.ID}}, '{{.Host}}', {{.Port}}, '{{.Username}}', '{{.EncryptedPassword}}', '{{.Services}}')">编辑</button>
+                        <button class="btn" onclick="deleteServer({{.ID}})">删除</button>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+                {{else}}
+                <div class="empty-state">
+                    暂无服务器，请点击"新增"按钮添加
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增/编辑弹窗 -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalTitle">新增服务器</div>
+            <form id="serverForm">
+                <input type="hidden" id="serverId" name="id">
+                <div class="form-group">
+                    <label>IP地址</label>
+                    <input type="text" id="host" name="host" required>
+                </div>
+                <div class="form-group">
+                    <label>端口</label>
+                    <input type="number" id="port" name="port" value="22" required>
+                </div>
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label>监控服务（逗号分隔）</label>
+                    <input type="text" id="services" name="services" placeholder="firewalld,nginx,mysql">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="hideModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let isEdit = false;
+
+        function formatBytes(bytes) {
+            if (bytes === 0 || bytes === undefined || bytes === null) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showModal() {
+            isEdit = false;
+            document.getElementById('modalTitle').textContent = '新增服务器';
+            document.getElementById('serverForm').reset();
+            document.getElementById('serverId').value = '';
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        function hideModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        let originalEncryptedPassword = '';
+
+        function editServer(id, host, port, username, encryptedPassword, services) {
+            isEdit = true;
+            originalEncryptedPassword = encryptedPassword; // 保存原始加密密码
+            document.getElementById('modalTitle').textContent = '编辑服务器';
+            document.getElementById('serverId').value = id;
+            document.getElementById('host').value = host;
+            document.getElementById('port').value = port;
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = '[encrypted]'; // 显示占位符
+            document.getElementById('password').dataset.encrypted = encryptedPassword; // 保存加密密码
+            document.getElementById('services').value = services;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        document.getElementById('serverForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const method = isEdit ? 'PUT' : 'POST';
+
+            // 如果是编辑模式，检查密码是否被修改
+            if (isEdit) {
+                const passwordInput = document.getElementById('password');
+                const currentPassword = passwordInput.value;
+
+                // 如果密码还是占位符，使用原始加密密码
+                if (currentPassword === '[encrypted]') {
+                    formData.set('password', originalEncryptedPassword);
+                }
+                // 如果密码被修改了（不是占位符），则提交明文密码，后端会重新加密
+            }
+
+            fetch('/api/servers', {
+                method: method,
+                body: new URLSearchParams(formData)
+            }).then(res => {
+                if (res.ok) {
+                    hideModal();
+                    location.reload();
+                } else {
+                    alert('操作失败');
+                }
+            });
+        });
+
+        function deleteServer(id) {
+            console.log('删除服务器ID:', id, '类型:', typeof id);
+            if (!confirm('确定要删除吗？')) return;
+
+            // 使用URL查询参数传递ID
+            fetch('/api/servers?id=' + encodeURIComponent(id), {
+                method: 'DELETE'
+            }).then(res => {
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    res.text().then(text => alert('删除失败: ' + text));
+                }
+            }).catch(err => alert('删除请求失败: ' + err));
+        }
+
+        async function checkServer(id) {
+            // 显示检查中提示
+            const btn = document.querySelector(`button[onclick="checkServer(${id})"]`);
+            const originalText = btn ? btn.textContent : '更新';
+            if (btn) {
+                btn.textContent = '检查中...';
+                btn.disabled = true;
+            }
+
+            try {
+                await fetch('/api/server/check', {
+                    method: 'POST',
+                    body: new URLSearchParams({ id: id })
+                });
+
+                // 轮询等待检查完成（最多60秒）
+                for (let i = 0; i < 120; i++) {
+                    await new Promise(r => setTimeout(r, 500));
+                    const res = await fetch('/api/server/checking-count?id=' + id);
+                    const count = parseInt(await res.text()) || 0;
+                    if (count === 0) break; // 检查完成
+                }
+
+                // 局部刷新该服务器状态
+                await refreshServerStatus(id);
+            } finally {
+                if (btn) {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        // 局部刷新单个服务器状态
+        async function refreshServerStatus(id) {
+            try {
+                const res = await fetch('/api/server/status?id=' + id);
+                const data = await res.json();
+                if (data) {
+                    updateServerRow(id, data);
+                }
+            } catch (e) {
+                console.error('刷新状态失败:', e);
+            }
+        }
+
+        // 更新服务器行显示
+        function updateServerRow(id, data) {
+            const row = document.querySelector(`.server-row[data-id="${id}"]`);
+            if (!row) return location.reload(); // 如果找不到行，刷新整个页面
+
+            // 更新CPU
+            const cpuEl = row.querySelector('.col-cpu');
+            if (cpuEl && data.CPU !== undefined) {
+                cpuEl.innerHTML = '<span class="label">CPU:</span> ' + renderProgressBar(data.CPU) + ' ' + data.CPU.toFixed(1) + '%';
+            }
+
+            // 更新内存
+            const memEl = row.querySelector('.col-memory');
+            if (memEl && data.MemUsage !== undefined) {
+                memEl.innerHTML = '<span class="label">内存:</span> ' + renderProgressBar(data.MemUsage) + ' ' + data.MemUsage.toFixed(1) + '%';
+            }
+
+            // 更新磁盘
+            const diskEl = row.querySelector('.col-disks');
+            if (diskEl && data.Disks) {
+                diskEl.innerHTML = renderDisks(data.Disks);
+            }
+
+            // 更新服务
+            const svcEl = row.querySelector('.col-services');
+            if (svcEl && data.Services) {
+                svcEl.innerHTML = renderServices(data.Services);
+            }
+
+            // 更新网络
+            const netEl = row.querySelector('.col-network');
+            if (netEl && data.NetRXBytes !== undefined) {
+                const rxTotal = formatBytes(data.NetRXBytes);
+                const txTotal = formatBytes(data.NetTXBytes);
+                const rxSpeed = (data.NetRXSpeed || 0).toFixed(2);
+                const txSpeed = (data.NetTXSpeed || 0).toFixed(2);
+                netEl.innerHTML = `<span class="label">网络:</span><br>总量: RX ${rxTotal} / TX ${txTotal}<br>瞬时: ↓ ${rxSpeed} KB/s ↑ ${txSpeed} KB/s`;
+            }
+
+            // 更新时间
+            const timeEl = row.querySelector('.col-time');
+            if (timeEl && data.CheckedAt) {
+                const date = new Date(data.CheckedAt);
+                timeEl.innerHTML = '<span class="label">更新:</span> ' + date.toLocaleString('zh-CN');
+            }
+        }
+
+        // 渲染进度条（仅返回进度条HTML，不包百分比数字）
+        function renderProgressBar(percent) {
+            let level = 'low';
+            if (percent >= 85) level = 'high';
+            else if (percent >= 60) level = 'medium';
+            return `<span class="progress-bar"><span class="progress-fill ${level}" style="width:${percent}%"></span></span>`;
+        }
+
+        // 渲染磁盘信息（按使用率降序排序，与后端一致）
+        function renderDisks(disks) {
+            if (!disks || disks.length === 0) return '-';
+            const sorted = [...disks].sort((a, b) => b.UsagePercent - a.UsagePercent);
+            return sorted.map(d => {
+                const avail = (d.TotalGB - d.UsedGB).toFixed(1);
+                const total = d.TotalGB.toFixed(1);
+                const bar = renderProgressBar(d.UsagePercent);
+                return `<div class="disk-item"><span class="disk-mount">${d.MountedOn}</span><span class="disk-usage">${bar} <span class="usage-info">${avail}/${total}G</span> <span class="percent-fixed">${d.UsagePercent.toFixed(0)}%</span></span></div>`;
+            }).join('');
+        }
+
+        // 渲染服务状态
+        function renderServices(services) {
+            if (!services || services.length === 0) return '-';
+            return services.map(s => {
+                const statusClass = s.Status === 'running' ? 'running' : 'stopped';
+                return `<div class="service-item"><span class="service-name">${s.Name}:</span><span class="service-tag ${statusClass}">${s.Status}</span></div>`;
+            }).join('');
+        }
+
+        function viewDetail(id) {
+            window.location.href = '/server/detail?id=' + id;
+        }
+
+        // 全局变量记录上次全量更新时间
+        let lastCheckAllTime = 0;
+
+        async function checkAll() {
+            try {
+                // 检查是否在1分钟内重复点击
+                const now = Date.now();
+                if (now - lastCheckAllTime < 60000) {
+                    const remaining = Math.ceil((60000 - (now - lastCheckAllTime)) / 1000);
+                    alert(`请等待 ${remaining} 秒后再进行全量更新`);
+                    return;
+                }
+                lastCheckAllTime = now;
+
+                const response = await fetch('/api/server/checkall', { method: 'POST' });
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                // 显示进度提示
+                const statusDiv = document.createElement('div');
+                statusDiv.id = 'checkStatus';
+                statusDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#333;color:#fff;padding:20px;border-radius:8px;z-index:9999;';
+                statusDiv.innerHTML = '正在检查服务器...<br><span id="checkCount">0</span> 个服务器检查中';
+                document.body.appendChild(statusDiv);
+
+                let checkTimes = 0;
+                const maxCheckTimes = 120; // 最多等待60秒 (120 * 500ms)
+
+                // 轮询检查是否全部完成
+                const checkComplete = async () => {
+                    try {
+                        checkTimes++;
+                        const countRes = await fetch('/api/server/checking-count');
+                        const countText = await countRes.text();
+                        const count = parseInt(countText) || 0; // 防止NaN
+
+                        const countSpan = document.getElementById('checkCount');
+                        if (countSpan) {
+                            if (count === 0) {
+                                countSpan.textContent = '已完成';
+                            } else {
+                                countSpan.textContent = count;
+                            }
+                        }
+
+                        if (count === 0 || checkTimes >= maxCheckTimes) {
+                            // 所有检查完成或超时，刷新页面
+                            setTimeout(() => {
+                                if (document.body.contains(statusDiv)) {
+                                    document.body.removeChild(statusDiv);
+                                }
+                                location.reload();
+                            }, 500); // 延迟500ms让用户看到"已完成"
+                        } else {
+                            // 还有服务器在检查中，继续等待
+                            setTimeout(checkComplete, 500);
+                        }
+                    } catch (err) {
+                        console.error('Error checking status:', err);
+                        // 出错也刷新页面
+                        if (document.body.contains(statusDiv)) {
+                            document.body.removeChild(statusDiv);
+                        }
+                        location.reload();
+                    }
+                };
+
+                // 开始轮询
+                setTimeout(checkComplete, 500);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('更新失败: ' + error.message);
+            }
+        }
+
+        function exportCSV() {
+            window.location.href = '/api/server/export';
+        }
+
+        // 点击弹窗外部关闭
+        document.getElementById('modal').addEventListener('click', function (e) {
+            if (e.target === this) hideModal();
+        });
+    </script>
+</body>
+
+</html>
